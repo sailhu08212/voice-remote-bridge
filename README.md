@@ -222,3 +222,7 @@ dotnet publish .\src\VoiceRemoteBridge.App\VoiceRemoteBridge.App.csproj --config
 - [总体方案](docs/plans/Windows语音遥控桥接软件方案.md)
 - [双按语音会话实施方案](docs/plans/双按语音会话实施方案.md)
 - [阶段0实测证据](docs/plans/阶段0实测证据.md)
+
+## 开源许可证
+
+本项目采用 [MIT License](LICENSE)。允许使用、复制、修改、合并、发布、分发、再许可和销售软件副本，但必须保留原版权声明和许可证声明。软件按“原样”提供，不附带任何明示或暗示担保。
