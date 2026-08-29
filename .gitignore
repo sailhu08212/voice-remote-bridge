@@ -1,0 +1,22 @@
+# Build output
+**/bin/
+**/obj/
+artifacts/
+
+# IDE and user-local state
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Runtime state and logs
+*.log
+*.dmp
+*.etl
+settings.local.json
+
+# Local collaboration and review material
+AGENTS.md
+docs/plans/*评审意见*.md

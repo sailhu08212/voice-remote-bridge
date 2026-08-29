@@ -1,0 +1,217 @@
+<Window x:Class="VoiceRemoteBridge.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Voice Remote Bridge"
+        Width="900"
+        Height="650"
+        MinWidth="760"
+        MinHeight="560"
+        WindowStartupLocation="CenterScreen">
+    <Grid Background="#F8FAFC">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="#0F172A" Padding="24,18">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="Voice Remote Bridge" Foreground="White" FontSize="24" FontWeight="SemiBold" />
+                    <TextBlock Text="Android 电视遥控器语音键 → Windows 语音输入" Foreground="#CBD5E1" Margin="0,4,0,0" />
+                </StackPanel>
+                <Border Grid.Column="1" Background="#1E293B" CornerRadius="16" Padding="14,7" VerticalAlignment="Center">
+                    <TextBlock x:Name="HeaderStatusText" Text="正在初始化" Foreground="#F8FAFC" FontWeight="SemiBold" />
+                </Border>
+            </Grid>
+        </Border>
+
+        <TabControl Grid.Row="1" Margin="20">
+            <TabItem Header="设备">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="18" MaxWidth="720" HorizontalAlignment="Left">
+                        <TextBlock Text="USB 接收端" FontSize="19" FontWeight="SemiBold" />
+                        <TextBlock Text="只读取指定 VID/PID 的 HID 接口，不采集电脑普通键盘。" Foreground="#475569" Margin="0,4,0,14" />
+                        <TextBlock Text="硬件标识" />
+                        <TextBox x:Name="HardwareIdTextBox" />
+                        <TextBlock Text="麦克风名称" />
+                        <TextBox x:Name="AudioEndpointTextBox" />
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,14">
+                            <Button Content="刷新设备" Click="RefreshDevices_Click" />
+                            <Button Content="保存基础设置" Click="SaveSettings_Click" />
+                        </StackPanel>
+                        <Border Background="White" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="6" Padding="14">
+                            <TextBlock x:Name="DeviceDetailsText" TextWrapping="Wrap" FontFamily="Consolas" />
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="语音键">
+                <StackPanel Margin="18" MaxWidth="720" HorizontalAlignment="Left">
+                    <TextBlock Text="语音键学习状态" FontSize="19" FontWeight="SemiBold" />
+                    <TextBlock x:Name="BindingStatusText" Margin="0,8,0,14" TextWrapping="Wrap" />
+                    <TextBlock Text="采集通道" />
+                    <ComboBox x:Name="LearningEndpointComboBox" DisplayMemberPath="DisplayName" />
+                    <WrapPanel Margin="0,6,0,12">
+                        <Button x:Name="BeginLearningButton" Content="1. 开始（保持松开）" Click="BeginLearning_Click" />
+                        <Button x:Name="LearnPressedButton" Content="2. 现在按住" Click="LearnPressed_Click" IsEnabled="False" />
+                        <Button x:Name="LearnReleasedButton" Content="3. 现在松开" Click="LearnReleased_Click" IsEnabled="False" />
+                        <Button x:Name="FinishLearningButton" Content="4. 完成学习" Click="FinishLearning_Click" IsEnabled="False" />
+                        <Button x:Name="CancelLearningButton" Content="取消" Click="CancelLearning_Click" IsEnabled="False" />
+                    </WrapPanel>
+                    <TextBlock x:Name="LearningInstructionText" Text="选择一个通道后按步骤操作；每一步停留约 1 秒。" TextWrapping="Wrap" Margin="0,0,0,14" />
+                    <Border Background="#FFF7ED" BorderBrush="#FDBA74" BorderThickness="1" CornerRadius="6" Padding="14">
+                        <TextBlock Text="学习只在所选 VID/PID 和 HID Usage 上临时读取报告，不采集普通键盘，不保存原始报告。生成规则后必须按所选交互模式验收；一次脉冲归零不等于实体松手。" TextWrapping="Wrap" />
+                    </Border>
+                </StackPanel>
+            </TabItem>
+
+            <TabItem Header="语音软件">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="18" MaxWidth="720" HorizontalAlignment="Left">
+                        <TextBlock Text="适配器" FontSize="19" FontWeight="SemiBold" />
+                        <TextBlock x:Name="AdapterStatusText" Margin="0,8,0,14" TextWrapping="Wrap" />
+                        <TextBlock Text="名称" />
+                        <TextBox x:Name="AdapterNameTextBox" />
+                        <TextBlock Text="触发模型" />
+                        <ComboBox x:Name="TriggerModelComboBox" SelectionChanged="TriggerModelComboBox_SelectionChanged" />
+                        <TextBlock Text="开始快捷键（例如 Ctrl+Win、Win+H、F13）" />
+                        <TextBox x:Name="StartChordTextBox" />
+                        <TextBlock x:Name="StopChordLabel" Text="停止快捷键（仅开始/停止双动作必填）" />
+                        <TextBox x:Name="StopChordTextBox" />
+                        <TextBlock Text="注入方式" />
+                        <ComboBox x:Name="InjectionModeComboBox" />
+                        <TextBlock Text="必须运行的进程（逗号分隔，可空）" />
+                        <TextBox x:Name="RequiredProcessesTextBox" />
+                        <TextBlock Text="已知冲突进程（逗号分隔，可空）" />
+                        <TextBox x:Name="ConflictingProcessesTextBox" />
+                        <TextBlock Text="目标输入法名称、Profile GUID 或布局 ID（可空）" />
+                        <TextBox x:Name="RequiredImeTextBox" />
+                        <CheckBox x:Name="SwitchInputMethodCheckBox"
+                                  Content="语音开始前切到目标输入法，提交后恢复原输入法"
+                                  Margin="0,6,0,2" />
+                        <CheckBox x:Name="EnableInputMethodProfileCheckBox"
+                                  Content="必要时确认启用目标 Profile（写入当前用户 TSF 启用状态）"
+                                  Margin="0,2,0,2" />
+                        <TextBlock Text="切换成功后等待多久再发送开始快捷键（毫秒）" />
+                        <TextBox x:Name="InputMethodPostActivationDelayTextBox"
+                                 Width="180"
+                                 HorizontalAlignment="Left" />
+                        <TextBlock Text="提交后等待多久恢复输入法（毫秒）" />
+                        <TextBox x:Name="InputMethodRestoreDelayTextBox"
+                                 Width="180"
+                                 HorizontalAlignment="Left" />
+                        <TextBlock Text="自动切换使用 Windows TSF Profile 精确匹配，不会模拟 Ctrl+Shift/Win+Space，也不会修改系统默认输入法；启动等待只在本轮确实切换输入法时生效；启用 Profile 仅应对已获授权的目标输入法开启。"
+                                   Foreground="#475569"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,6" />
+                        <CheckBox x:Name="ConfirmVoiceUiCheckBox"
+                                  Content="发送开始快捷键后，确认语音窗口确实出现"
+                                  Margin="0,6,0,2" />
+                        <TextBlock Text="语音窗口进程名（例如 wetype_update）" />
+                        <TextBox x:Name="VoiceUiProcessTextBox" />
+                        <TextBlock Text="语音窗口类名（例如 wetype.flutter.setting）" />
+                        <TextBox x:Name="VoiceUiClassTextBox" />
+                        <TextBlock Text="启动确认最长等待（毫秒）" />
+                        <TextBox x:Name="VoiceUiTimeoutTextBox"
+                                 Width="180"
+                                 HorizontalAlignment="Left" />
+                        <TextBlock Text="确认只读取进程名、窗口类和可见状态，不读取窗口文字、候选词或转写内容，也不依赖主屏/副屏坐标。"
+                                   Foreground="#475569"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,6" />
+                        <TextBlock Text="禁止同时按住的修饰键（例如 Shift，可空）" />
+                        <TextBox x:Name="ForbiddenModifiersTextBox" />
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,8">
+                            <Button Content="保存/选择此适配器" Click="SaveAdapter_Click" />
+                            <Button Content="清除当前选择" Click="ClearAdapter_Click" />
+                        </StackPanel>
+                        <TextBlock Text="快捷键实测会真实触发当前前台软件，请先把光标放在专用测试输入框；F13 按钮只验证 Down/Up 注入链路。" TextWrapping="Wrap" Foreground="#9A3412" />
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <Button Content="安全测试 F13" Click="TestF13_Click" />
+                            <Button Content="实测开始快捷键" Click="TestAdapterStart_Click" />
+                            <Button Content="实测停止快捷键" Click="TestAdapterStop_Click" />
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="触发与安全">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="18" MaxWidth="720" HorizontalAlignment="Left">
+                    <TextBlock Text="触发参数" FontSize="19" FontWeight="SemiBold" />
+                    <TextBlock Text="交互模式" Margin="0,12,0,0" />
+                    <ComboBox x:Name="InteractionModeComboBox"
+                              Width="360"
+                              HorizontalAlignment="Left"
+                              DisplayMemberPath="Value"
+                              SelectedValuePath="Key"
+                              SelectionChanged="InteractionModeComboBox_SelectionChanged" />
+                    <TextBlock x:Name="InteractionModeDescriptionText"
+                               Margin="0,6,0,8"
+                               Foreground="#475569"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="长按阈值（毫秒）" Margin="0,12,0,0" />
+                    <TextBox x:Name="HoldThresholdTextBox" Width="180" HorizontalAlignment="Left" />
+                    <TextBlock Text="单次最长听写（秒）" />
+                    <TextBox x:Name="MaximumSpeechTextBox" Width="180" HorizontalAlignment="Left" />
+                    <TextBlock Text="麦克风激活检测" Margin="0,14,0,4" FontWeight="SemiBold" />
+                    <TextBlock Text="只分析内存中的音量特征，不保存、上传或转写音频。" Foreground="#475569" TextWrapping="Wrap" />
+                    <TextBlock Text="激活最长等待（毫秒）" Margin="0,8,0,0" />
+                    <TextBox x:Name="AudioActivationTimeoutTextBox" Width="180" HorizontalAlignment="Left" />
+                    <TextBlock Text="启动预热忽略时间（毫秒）" />
+                    <TextBox x:Name="AudioActivationWarmupTextBox" Width="180" HorizontalAlignment="Left" />
+                    <TextBlock Text="RMS 激活阈值（0 到 1）" />
+                    <TextBox x:Name="AudioActivationRmsTextBox" Width="180" HorizontalAlignment="Left" />
+                    <TextBlock Text="连续有效音频包数" />
+                    <TextBox x:Name="AudioActivationPacketsTextBox" Width="180" HorizontalAlignment="Left" />
+                    <TextBlock Text="激活确认后的音频交接时间（毫秒）" />
+                    <TextBox x:Name="AudioHandoffTextBox" Width="180" HorizontalAlignment="Left" />
+                    <CheckBox x:Name="StartWithWindowsCheckBox"
+                              Content="登录 Windows 后自动启动（后台进入托盘）"
+                              Margin="0,10,0,12" />
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <Button Content="保存参数" Click="SaveSettings_Click" />
+                        <Button x:Name="StartBridgeButton" Content="启动桥接" Click="StartBridge_Click" />
+                        <Button x:Name="StopBridgeButton" Content="停止桥接" Click="StopBridge_Click" IsEnabled="False" />
+                        <Button Content="紧急停止" Background="#FEE2E2" Foreground="#991B1B" Click="EmergencyStop_Click" />
+                    </StackPanel>
+                </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="诊断">
+                <Grid Margin="18">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Button Content="运行一键自检" Click="RunDiagnostics_Click" />
+                        <Button Content="清空本页显示" Click="ClearDiagnostics_Click" />
+                    </StackPanel>
+                    <TextBox Grid.Row="1" x:Name="DiagnosticsTextBox" IsReadOnly="True" FontFamily="Consolas"
+                             TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AcceptsReturn="True" />
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <Border Grid.Row="2" Background="White" BorderBrush="#E2E8F0" BorderThickness="0,1,0,0" Padding="20,10">
+            <DockPanel>
+                <TextBlock x:Name="FooterStatusText" Text="未就绪" Foreground="#475569" VerticalAlignment="Center" />
+                <Button Content="紧急释放按键"
+                        DockPanel.Dock="Right"
+                        Background="#FEE2E2"
+                        Foreground="#991B1B"
+                        Click="EmergencyStop_Click" />
+                <Button Content="隐藏到托盘" DockPanel.Dock="Right" Click="Hide_Click" />
+                <Button Content="退出" DockPanel.Dock="Right" Click="Exit_Click" />
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

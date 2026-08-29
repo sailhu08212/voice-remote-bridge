@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <StartupObject>VoiceRemoteBridge.App.Program</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../VoiceRemoteBridge.Core/VoiceRemoteBridge.Core.csproj" />
+    <ProjectReference Include="../VoiceRemoteBridge.InputGuard/VoiceRemoteBridge.InputGuard.csproj" />
+    <ProjectReference Include="../VoiceRemoteBridge.Windows/VoiceRemoteBridge.Windows.csproj" />
+  </ItemGroup>
+</Project>

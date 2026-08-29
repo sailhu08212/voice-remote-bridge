@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="src/VoiceRemoteBridge.App/VoiceRemoteBridge.App.csproj" />
+  <Project Path="src/VoiceRemoteBridge.Core/VoiceRemoteBridge.Core.csproj" />
+  <Project Path="src/VoiceRemoteBridge.InputGuard/VoiceRemoteBridge.InputGuard.csproj" />
+  <Project Path="src/VoiceRemoteBridge.Windows/VoiceRemoteBridge.Windows.csproj" />
+  <Project Path="tests/VoiceRemoteBridge.Core.Tests/VoiceRemoteBridge.Core.Tests.csproj" />
+  <Project Path="tests/VoiceRemoteBridge.Windows.Tests/VoiceRemoteBridge.Windows.Tests.csproj" />
+  <Project Path="tools/HidProbe/HidProbe.csproj" />
+  <Project Path="tools/InputInjectionProbe/InputInjectionProbe.csproj" />
+</Solution>
