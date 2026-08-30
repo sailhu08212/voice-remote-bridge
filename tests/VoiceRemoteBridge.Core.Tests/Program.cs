@@ -388,6 +388,9 @@ internal static class Program
     {
         InputMethodSwitchOptions defaults = new() { TargetProfile = "WeType" };
         Equal(1_000, defaults.PostActivationDelayMilliseconds);
+        True(
+            defaults.RefreshWhenAlreadyActive is null,
+            "Unspecified TSF refresh must remain distinguishable for settings migration.");
 
         InputMethodSwitchOptions invalid = new()
         {

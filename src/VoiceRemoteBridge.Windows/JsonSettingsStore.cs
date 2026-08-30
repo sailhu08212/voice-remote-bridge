@@ -58,6 +58,7 @@ public sealed class JsonSettingsStore
                 return new SettingsLoadResult(new AppSettings(), true, ["Settings file was empty."]);
             }
 
+            settings = ApplyCompatibilityDefaults(settings);
             IReadOnlyList<string> validationErrors = settings.Validate();
             return validationErrors.Count == 0
                 ? new SettingsLoadResult(settings, true, [])
@@ -108,5 +109,40 @@ public sealed class JsonSettingsStore
                 File.Delete(temporaryPath);
             }
         }
+    }
+
+    private static AppSettings ApplyCompatibilityDefaults(AppSettings settings)
+    {
+        AdapterProfile? adapter = settings.SelectedAdapter;
+        InputMethodSwitchOptions? inputMethodSwitch = adapter?.InputMethodSwitch;
+        if (adapter is null ||
+            inputMethodSwitch is null ||
+            inputMethodSwitch.RefreshWhenAlreadyActive is not null)
+        {
+            return settings;
+        }
+
+        bool isWeType = inputMethodSwitch.TargetProfile.Contains(
+                "WeType",
+                StringComparison.OrdinalIgnoreCase) ||
+            inputMethodSwitch.TargetProfile.Contains(
+                "微信输入法",
+                StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(
+                inputMethodSwitch.TargetProfile,
+                "{607FDF85-FCC8-4DBD-A365-41296F980C9C}",
+                StringComparison.OrdinalIgnoreCase);
+        if (!isWeType)
+        {
+            return settings;
+        }
+
+        return settings with
+        {
+            SelectedAdapter = adapter with
+            {
+                InputMethodSwitch = inputMethodSwitch with { RefreshWhenAlreadyActive = true }
+            }
+        };
     }
 }

@@ -304,7 +304,8 @@ public partial class MainWindow : Window
                 TargetProfile = requiredInputMethod,
                 PostActivationDelayMilliseconds = postActivationDelayMilliseconds,
                 RestoreDelayMilliseconds = restoreDelayMilliseconds,
-                AllowProfileEnablement = EnableInputMethodProfileCheckBox.IsChecked == true
+                AllowProfileEnablement = EnableInputMethodProfileCheckBox.IsChecked == true,
+                RefreshWhenAlreadyActive = RefreshActiveInputMethodCheckBox.IsChecked == true
             };
         }
 
@@ -771,6 +772,7 @@ public partial class MainWindow : Window
         RequiredImeTextBox.Text = profile?.RequiresActiveIme ?? string.Empty;
         SwitchInputMethodCheckBox.IsChecked = profile?.InputMethodSwitch is not null;
         EnableInputMethodProfileCheckBox.IsChecked = profile?.InputMethodSwitch?.AllowProfileEnablement == true;
+        RefreshActiveInputMethodCheckBox.IsChecked = profile?.InputMethodSwitch?.RefreshWhenAlreadyActive == true;
         InputMethodPostActivationDelayTextBox.Text = (
             profile?.InputMethodSwitch?.PostActivationDelayMilliseconds ?? 1_000).ToString(CultureInfo.InvariantCulture);
         InputMethodRestoreDelayTextBox.Text = (

@@ -13,7 +13,8 @@ public sealed record InputMethodProfileDescriptor(
     Guid ClassId,
     Guid ProfileId,
     nint KeyboardLayout,
-    string Description)
+    string Description,
+    uint Flags = 0)
 {
     public bool IsSameProfile(InputMethodProfileDescriptor other)
     {
@@ -47,6 +48,8 @@ public interface IInputMethodProfileManager
 
     InputMethodProfileDescriptor? FindInstalledProfile(string targetProfile);
 
+    InputMethodProfileDescriptor? FindEnabledFallbackProfile(InputMethodProfileDescriptor targetProfile);
+
     void ActivateProfile(InputMethodProfileDescriptor profile, bool enableIfNeeded);
 }
 
@@ -58,6 +61,7 @@ public sealed class InputMethodProfileManager : IInputMethodProfileManager, IDis
     private const uint ActivateForSession = 0x20000000;
     private const uint EnableProfile = 0x00000001;
     private const uint IgnoreCurrentInputLanguage = 0x00000004;
+    private const uint ProfileEnabled = 0x00000002;
     private const int RpcChangedMode = unchecked((int)0x80010106);
     private const string TipRegistryPath = @"SOFTWARE\Microsoft\CTF\TIP";
     private static readonly Guid KeyboardCategory = new("34745C63-B2F0-4784-8B67-5E12C8701A31");
@@ -142,6 +146,19 @@ public sealed class InputMethodProfileManager : IInputMethodProfileManager, IDis
             ActivateProfileCore(profile, enableIfNeeded);
             return true;
         });
+    }
+
+    public InputMethodProfileDescriptor? FindEnabledFallbackProfile(
+        InputMethodProfileDescriptor targetProfile)
+    {
+        ArgumentNullException.ThrowIfNull(targetProfile);
+        return InvokeOnSta(() => EnumerateInstalledProfilesCore(0)
+            .Where(profile =>
+                !profile.IsSameProfile(targetProfile) &&
+                (profile.Flags & ProfileEnabled) != 0)
+            .OrderBy(profile => profile.LanguageId == targetProfile.LanguageId ? 0 : 1)
+            .ThenBy(profile => profile.ProfileType == KeyboardLayoutProfileType ? 0 : 1)
+            .FirstOrDefault());
     }
 
     public IReadOnlyList<InputMethodProfileDescriptor> EnumerateInstalledProfiles(ushort languageId = 0) =>
@@ -560,7 +577,8 @@ public sealed class InputMethodProfileManager : IInputMethodProfileManager, IDis
             profile.ClassId,
             profile.ProfileId,
             profile.KeyboardLayout,
-            description);
+            description,
+            profile.Flags);
 
     private static void ExecuteWithProfileManager<TResult>(
         Func<IInputProcessorProfileManager, TResult> action,
@@ -642,6 +660,63 @@ public sealed class InputMethodSessionController
 
             if (original.IsSameProfile(target))
             {
+                if (options.RefreshWhenAlreadyActive == true)
+                {
+                    InputMethodProfileDescriptor? fallback =
+                        profileManager.FindEnabledFallbackProfile(target);
+                    if (fallback is null)
+                    {
+                        return new InputMethodSessionResult(
+                            false,
+                            false,
+                            "目标输入法需要刷新，但未找到已启用的临时输入 Profile；已取消本轮。");
+                    }
+
+                    activationAttempted = true;
+                    profileManager.ActivateProfile(fallback, enableIfNeeded: false);
+                    bool fallbackConfirmed = await ConfirmActiveAsync(
+                        fallback,
+                        options.ActivationTimeoutMilliseconds,
+                        cancellationToken).ConfigureAwait(false);
+                    if (!fallbackConfirmed)
+                    {
+                        InputMethodSessionResult rollback = await RestoreAfterFailedBeginAsync(original, options)
+                            .ConfigureAwait(false);
+                        return new InputMethodSessionResult(
+                            false,
+                            false,
+                            $"切换到临时输入 Profile {fallback.Describe()} 后未在时限内确认。{rollback.Message}");
+                    }
+
+                    profileManager.ActivateProfile(target, options.AllowProfileEnablement);
+                    bool targetConfirmed = await ConfirmActiveAsync(
+                        target,
+                        options.ActivationTimeoutMilliseconds,
+                        cancellationToken).ConfigureAwait(false);
+                    if (!targetConfirmed)
+                    {
+                        InputMethodSessionResult rollback = await RestoreAfterFailedBeginAsync(original, options)
+                            .ConfigureAwait(false);
+                        return new InputMethodSessionResult(
+                            false,
+                            false,
+                            $"刷新后切回 {target.Describe()} 未在时限内确认。{rollback.Message}");
+                    }
+
+                    if (options.PostActivationDelayMilliseconds > 0)
+                    {
+                        await delay(
+                            TimeSpan.FromMilliseconds(options.PostActivationDelayMilliseconds),
+                            cancellationToken).ConfigureAwait(false);
+                    }
+
+                    session = new Session(epoch, original, Changed: false);
+                    return new InputMethodSessionResult(
+                        true,
+                        false,
+                        $"目标输入法 TSF 会话已刷新：{fallback.Describe()} → {target.Describe()}；已等待 {options.PostActivationDelayMilliseconds} ms 让快捷键监听就绪。");
+                }
+
                 session = new Session(epoch, original, Changed: false);
                 return new InputMethodSessionResult(
                     true,

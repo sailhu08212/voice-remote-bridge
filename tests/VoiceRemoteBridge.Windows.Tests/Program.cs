@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Reflection;
+using System.Text.Json.Nodes;
 using VoiceRemoteBridge.Core;
 using VoiceRemoteBridge.Windows;
 
@@ -184,7 +185,8 @@ internal static class Program
                         ActivationTimeoutMilliseconds = 900,
                         PostActivationDelayMilliseconds = 650,
                         RestoreDelayMilliseconds = 550,
-                        AllowProfileEnablement = true
+                        AllowProfileEnablement = true,
+                        RefreshWhenAlreadyActive = true
                     },
                     VoiceUiConfirmation = new VoiceUiConfirmationOptions
                     {
@@ -214,9 +216,32 @@ internal static class Program
             True(
                 loaded.Settings.SelectedAdapter.InputMethodSwitch.AllowProfileEnablement,
                 "AllowProfileEnablement was not persisted.");
+            True(
+                loaded.Settings.SelectedAdapter.InputMethodSwitch.RefreshWhenAlreadyActive == true,
+                "RefreshWhenAlreadyActive was not persisted.");
             Equal("wetype_update", loaded.Settings.SelectedAdapter.VoiceUiConfirmation!.ProcessName);
             Equal("wetype.flutter.setting", loaded.Settings.SelectedAdapter.VoiceUiConfirmation.WindowClass);
             Equal(2_500, loaded.Settings.SelectedAdapter.VoiceUiConfirmation.TimeoutMilliseconds);
+
+            string legacyWeTypeJson = await File.ReadAllTextAsync(file).ConfigureAwait(false);
+            True(
+                legacyWeTypeJson.Contains("\"refreshWhenAlreadyActive\": true", StringComparison.Ordinal),
+                "WeType settings fixture did not contain the refresh field before migration test.");
+            JsonNode legacyWeTypeNode = JsonNode.Parse(legacyWeTypeJson)
+                ?? throw new InvalidOperationException("Unable to parse the WeType migration fixture.");
+            bool removedRefreshField = legacyWeTypeNode["selectedAdapter"]?["inputMethodSwitch"]?
+                .AsObject()
+                .Remove("refreshWhenAlreadyActive") == true;
+            True(removedRefreshField, "Migration fixture did not remove the refresh field.");
+            legacyWeTypeJson = legacyWeTypeNode.ToJsonString();
+            False(
+                legacyWeTypeJson.Contains("\"refreshWhenAlreadyActive\": true", StringComparison.Ordinal),
+                "Migration fixture still contained the refresh field after removal.");
+            await File.WriteAllTextAsync(file, legacyWeTypeJson).ConfigureAwait(false);
+            SettingsLoadResult migratedWeType = await store.LoadAsync().ConfigureAwait(false);
+            True(
+                migratedWeType.Settings.SelectedAdapter!.InputMethodSwitch!.RefreshWhenAlreadyActive == true,
+                "Legacy WeType settings did not enable the TSF refresh compatibility default.");
 
             await File.WriteAllTextAsync(
                 file,
@@ -268,6 +293,14 @@ internal static class Program
             new Guid("607FDF85-FCC8-4DBD-A365-41296F980C9C"),
             nint.Zero,
             "WeType");
+        InputMethodProfileDescriptor fallback = new(
+            2,
+            0x0804,
+            Guid.Empty,
+            Guid.Empty,
+            new nint(unchecked((int)0x08040804)),
+            "Temporary layout",
+            0x00000002);
         InputMethodSwitchOptions options = new()
         {
             TargetProfile = "WeType",
@@ -311,7 +344,58 @@ internal static class Program
         Equal(0, events.Count);
 
         events.Clear();
+        manager.Active = target;
+        manager.FallbackProfile = fallback;
+        InputMethodSwitchOptions refreshOptions = options with { RefreshWhenAlreadyActive = true };
+        InputMethodSessionController refreshController = new(
+            manager,
+            (duration, _) =>
+            {
+                events.Add($"delay:{duration.TotalMilliseconds:F0}");
+                return Task.CompletedTask;
+            });
+        InputMethodSessionResult refreshed = await refreshController.BeginAsync(81, refreshOptions).ConfigureAwait(false);
+        True(refreshed.Succeeded && !refreshed.Changed, refreshed.Message);
+        Equal("activate:Temporary layout:enable=False", events[0]);
+        Equal("activate:WeType:enable=True", events[1]);
+        Equal("delay:1000", events[2]);
+        True(manager.Active.IsSameProfile(target), "Successful refresh did not reactivate the target profile.");
+        events.Clear();
+        InputMethodSessionResult refreshedRestore = await refreshController.RestoreAsync(
+            81,
+            refreshOptions,
+            emergency: false).ConfigureAwait(false);
+        True(refreshedRestore.Succeeded && !refreshedRestore.Changed, refreshedRestore.Message);
+        Equal(0, events.Count);
+
+        events.Clear();
+        manager.Active = target;
+        manager.FallbackProfile = null;
+        InputMethodSessionController missingFallbackController = new(manager, (_, _) => Task.CompletedTask);
+        InputMethodSessionResult missingFallback = await missingFallbackController.BeginAsync(
+            82,
+            refreshOptions).ConfigureAwait(false);
+        False(missingFallback.Succeeded, "Refresh without an enabled fallback profile was accepted.");
+        False(missingFallbackController.HasActiveSession, "Failed refresh retained an active session.");
+        Equal(0, events.Count);
+
+        events.Clear();
+        manager.Active = target;
+        manager.FallbackProfile = fallback;
+        manager.SuppressActivationFor = fallback;
+        InputMethodSessionController failedRefreshController = new(manager, (_, _) => Task.CompletedTask);
+        InputMethodSessionResult failedRefresh = await failedRefreshController.BeginAsync(
+            83,
+            refreshOptions).ConfigureAwait(false);
+        False(failedRefresh.Succeeded, "Unconfirmed fallback activation was accepted.");
+        False(failedRefreshController.HasActiveSession, "Failed refresh retained an active session.");
+        Equal("activate:Temporary layout:enable=False", events[0]);
+        Equal("activate:WeType:enable=False", events[^1]);
+        True(manager.Active.IsSameProfile(target), "Failed refresh did not retain the target profile.");
+
+        events.Clear();
         manager.Active = original;
+        manager.SuppressActivationFor = null;
         manager.SuppressActivationFor = target;
         InputMethodSessionController failedController = new(manager, (_, _) => Task.CompletedTask);
         InputMethodSessionResult failed = await failedController.BeginAsync(9, options).ConfigureAwait(false);
@@ -366,13 +450,13 @@ internal static class Program
         foreach (InputMethodProfileDescriptor profile in manager.EnumerateInstalledProfiles())
         {
             Console.WriteLine(
-                $"INFO installed-input-profile=type:{profile.ProfileType},lang:0x{profile.LanguageId:X4},class:{profile.ClassId:B},profile:{profile.ProfileId:B},flags-hkl:0x{profile.KeyboardLayout.ToInt64():X}");
+                $"INFO installed-input-profile=type:{profile.ProfileType},lang:0x{profile.LanguageId:X4},class:{profile.ClassId:B},profile:{profile.ProfileId:B},flags:0x{profile.Flags:X8},hkl:0x{profile.KeyboardLayout.ToInt64():X}");
         }
 
         foreach (InputMethodProfileDescriptor profile in manager.EnumerateInstalledProfiles(0x0804))
         {
             Console.WriteLine(
-                $"INFO zh-input-profile=type:{profile.ProfileType},lang:0x{profile.LanguageId:X4},class:{profile.ClassId:B},profile:{profile.ProfileId:B},flags-hkl:0x{profile.KeyboardLayout.ToInt64():X}");
+                $"INFO zh-input-profile=type:{profile.ProfileType},lang:0x{profile.LanguageId:X4},class:{profile.ClassId:B},profile:{profile.ProfileId:B},flags:0x{profile.Flags:X8},hkl:0x{profile.KeyboardLayout.ToInt64():X}");
         }
 
         InputMethodProfileDescriptor weType = manager.FindInstalledProfile("WeType")
@@ -931,12 +1015,17 @@ internal static class Program
 
         internal InputMethodProfileDescriptor? FailActivationFor { get; set; }
 
+        internal InputMethodProfileDescriptor? FallbackProfile { get; set; }
+
         public InputMethodProfileDescriptor CaptureActiveProfile() => Active;
 
         public InputMethodProfileDescriptor? FindInstalledProfile(string targetProfile) =>
             string.Equals(targetProfile, target.Description, StringComparison.OrdinalIgnoreCase)
                 ? target
                 : null;
+
+        public InputMethodProfileDescriptor? FindEnabledFallbackProfile(
+            InputMethodProfileDescriptor targetProfile) => FallbackProfile;
 
         public void ActivateProfile(InputMethodProfileDescriptor profile, bool enableIfNeeded)
         {

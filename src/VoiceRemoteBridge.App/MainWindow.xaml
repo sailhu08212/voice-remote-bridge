@@ -98,6 +98,9 @@
                         <CheckBox x:Name="EnableInputMethodProfileCheckBox"
                                   Content="必要时确认启用目标 Profile（写入当前用户 TSF 启用状态）"
                                   Margin="0,2,0,2" />
+                        <CheckBox x:Name="RefreshActiveInputMethodCheckBox"
+                                  Content="目标输入法已激活时，启动前刷新 TSF 会话（WeType 兼容）"
+                                  Margin="0,2,0,2" />
                         <TextBlock Text="切换成功后等待多久再发送开始快捷键（毫秒）" />
                         <TextBox x:Name="InputMethodPostActivationDelayTextBox"
                                  Width="180"
@@ -106,7 +109,7 @@
                         <TextBox x:Name="InputMethodRestoreDelayTextBox"
                                  Width="180"
                                  HorizontalAlignment="Left" />
-                        <TextBlock Text="自动切换使用 Windows TSF Profile 精确匹配，不会模拟 Ctrl+Shift/Win+Space，也不会修改系统默认输入法；启动等待只在本轮确实切换输入法时生效；启用 Profile 仅应对已获授权的目标输入法开启。"
+                        <TextBlock Text="自动切换和会话刷新使用 Windows TSF Profile 精确匹配，不会模拟 Ctrl+Shift/Win+Space，也不会修改系统默认输入法；会话刷新会临时切到一个已启用的非目标 Profile 再切回；启用 Profile 和刷新策略仅应对已验证的目标输入法开启。"
                                    Foreground="#475569"
                                    TextWrapping="Wrap"
                                    Margin="0,0,0,6" />

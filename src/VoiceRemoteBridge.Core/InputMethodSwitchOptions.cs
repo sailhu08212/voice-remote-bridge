@@ -14,6 +14,8 @@ public sealed record InputMethodSwitchOptions
 
     public bool AllowProfileEnablement { get; init; }
 
+    public bool? RefreshWhenAlreadyActive { get; init; }
+
     public IReadOnlyList<string> Validate()
     {
         List<string> errors = [];
